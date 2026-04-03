@@ -14,6 +14,7 @@ import eu.kanade.presentation.category.components.CategoryCreateDialog
 import eu.kanade.presentation.category.components.CategoryDeleteDialog
 import eu.kanade.presentation.category.components.CategoryRenameDialog
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.ui.qrshare.QrShareScreen
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.collectLatest
@@ -41,6 +42,7 @@ class CategoryScreen : Screen() {
             onClickCreate = { screenModel.showDialog(CategoryDialog.Create) },
             onClickRename = { screenModel.showDialog(CategoryDialog.Rename(it)) },
             onClickDelete = { screenModel.showDialog(CategoryDialog.Delete(it)) },
+            onClickShareViaQr = { category -> navigator.push(QrShareScreen(mangaIds = emptyList(), categoryId = category.id)) },
             onChangeOrder = screenModel::changeOrder,
             navigateUp = navigator::pop,
         )

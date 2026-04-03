@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.browse.source
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,6 +18,7 @@ import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.TabContent
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceScreen
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchScreen
+import eu.kanade.tachiyomi.ui.qrshare.QrScanScreen
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -36,6 +38,11 @@ fun Screen.sourcesTab(): TabContent {
                 title = stringResource(MR.strings.action_global_search),
                 icon = Icons.Outlined.TravelExplore,
                 onClick = { navigator.push(GlobalSearchScreen()) },
+            ),
+            AppBar.Action(
+                title = stringResource(MR.strings.qr_scan_title),
+                icon = Icons.Outlined.QrCodeScanner,
+                onClick = { navigator.push(QrScanScreen) },
             ),
             AppBar.Action(
                 title = stringResource(MR.strings.action_filter),

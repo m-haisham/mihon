@@ -42,6 +42,7 @@ import eu.kanade.tachiyomi.ui.category.CategoryScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.manga.MangaScreen
+import eu.kanade.tachiyomi.ui.qrshare.QrShareScreen
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.channels.Channel
@@ -154,6 +155,11 @@ data object LibraryTab : Tab {
                         val selection = state.selection
                         screenModel.clearSelection()
                         navigator.push(MigrationConfigScreen(selection))
+                    },
+                    onShareViaQrClicked = {
+                        val mangaIds = state.selectedManga.map { it.id }
+                        screenModel.clearSelection()
+                        navigator.push(QrShareScreen(mangaIds = mangaIds))
                     },
                 )
             },

@@ -106,6 +106,7 @@ fun MangaScreen(
 
     // For top action menu
     onShareClicked: (() -> Unit)?,
+    onShareViaQrClicked: (() -> Unit)?,
     onDownloadActionClicked: ((DownloadAction) -> Unit)?,
     onEditCategoryClicked: (() -> Unit)?,
     onEditFetchIntervalClicked: (() -> Unit)?,
@@ -155,6 +156,7 @@ fun MangaScreen(
             onSearch = onSearch,
             onCoverClicked = onCoverClicked,
             onShareClicked = onShareClicked,
+            onShareViaQrClicked = onShareViaQrClicked,
             onDownloadActionClicked = onDownloadActionClicked,
             onEditCategoryClicked = onEditCategoryClicked,
             onEditIntervalClicked = onEditFetchIntervalClicked,
@@ -191,6 +193,7 @@ fun MangaScreen(
             onSearch = onSearch,
             onCoverClicked = onCoverClicked,
             onShareClicked = onShareClicked,
+            onShareViaQrClicked = onShareViaQrClicked,
             onDownloadActionClicked = onDownloadActionClicked,
             onEditCategoryClicked = onEditCategoryClicked,
             onEditIntervalClicked = onEditFetchIntervalClicked,
@@ -237,6 +240,7 @@ private fun MangaScreenSmallImpl(
 
     // For top action menu
     onShareClicked: (() -> Unit)?,
+    onShareViaQrClicked: (() -> Unit)?,
     onDownloadActionClicked: ((DownloadAction) -> Unit)?,
     onEditCategoryClicked: (() -> Unit)?,
     onEditIntervalClicked: (() -> Unit)?,
@@ -296,6 +300,7 @@ private fun MangaScreenSmallImpl(
                 navigateUp = navigateUp,
                 onClickFilter = onFilterClicked,
                 onClickShare = onShareClicked,
+                onClickShareViaQr = onShareViaQrClicked,
                 onClickDownload = onDownloadActionClicked,
                 onClickEditCategory = onEditCategoryClicked,
                 onClickRefresh = onRefresh,
@@ -479,6 +484,7 @@ fun MangaScreenLargeImpl(
 
     // For top action menu
     onShareClicked: (() -> Unit)?,
+    onShareViaQrClicked: (() -> Unit)?,
     onDownloadActionClicked: ((DownloadAction) -> Unit)?,
     onEditCategoryClicked: (() -> Unit)?,
     onEditIntervalClicked: (() -> Unit)?,
@@ -531,6 +537,7 @@ fun MangaScreenLargeImpl(
                 navigateUp = navigateUp,
                 onClickFilter = onFilterButtonClicked,
                 onClickShare = onShareClicked,
+                onClickShareViaQr = onShareViaQrClicked,
                 onClickDownload = onDownloadActionClicked,
                 onClickEditCategory = onEditCategoryClicked,
                 onClickRefresh = onRefresh,

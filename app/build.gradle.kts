@@ -266,6 +266,9 @@ dependencies {
     implementation(libs.bundles.voyager)
     implementation(libs.composeMaterialMotion)
     implementation(libs.swipe)
+
+    // QR code generation and scanning
+    implementation(libs.qrkit)
     implementation(libs.composeWebview)
     implementation(libs.composeGrid)
     implementation(libs.reorderable)

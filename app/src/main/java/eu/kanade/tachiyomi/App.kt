@@ -1,5 +1,7 @@
 package eu.kanade.tachiyomi
 
+import qrgenerator.AppContext
+
 import android.annotation.SuppressLint
 import android.app.Application
 import android.app.PendingIntent
@@ -80,6 +82,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
     @SuppressLint("LaunchActivityFromNotification")
     override fun onCreate() {
         super<Application>.onCreate()
+        AppContext.apply { set(applicationContext) }
         patchInjekt()
         TelemetryConfig.init(applicationContext)
 
