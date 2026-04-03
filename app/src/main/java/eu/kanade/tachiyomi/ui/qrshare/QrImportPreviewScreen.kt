@@ -14,14 +14,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SmallExtendedFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -88,12 +91,22 @@ data class QrImportPreviewScreen(
             }
         }
 
+        val selectedCount = state.selectedMangaIndices.size
+
         Scaffold(
             topBar = { sb ->
                 AppBar(
                     title = stringResource(MR.strings.qr_import_title),
                     navigateUp = navigator::pop,
                     scrollBehavior = sb,
+                )
+            },
+            floatingActionButton = {
+                SmallExtendedFloatingActionButton(
+                    text = { Text(stringResource(MR.strings.qr_add_to_library)) },
+                    icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
+                    onClick = { screenModel.importSelected() },
+                    expanded = !state.isImporting && selectedCount > 0,
                 )
             },
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -104,9 +117,9 @@ data class QrImportPreviewScreen(
                     contentPadding = contentPadding,
                     missingSources = screenModel.missingSources,
                     onToggleKeepCategories = screenModel::toggleKeepOriginalCategories,
-                    onImportAll = { screenModel.importAll(allowMissingSources = true) },
-                    onImportAvailableOnly = { screenModel.importAll(allowMissingSources = false) },
-                    onCancel = navigator::pop,
+                    onToggleMangaSelection = screenModel::toggleMangaSelection,
+                    onSelectAll = screenModel::selectAll,
+                    onDeselectAll = screenModel::deselectAll,
                     onNavigateToBrowse = {
                         coroutineScope.launch {
                             navigator.popUntilRoot()
@@ -128,13 +141,19 @@ private fun QrImportContent(
     contentPadding: PaddingValues,
     missingSources: List<BackupSource>,
     onToggleKeepCategories: () -> Unit,
-    onImportAll: () -> Unit,
-    onImportAvailableOnly: () -> Unit,
-    onCancel: () -> Unit,
+    onToggleMangaSelection: (Int) -> Unit,
+    onSelectAll: () -> Unit,
+    onDeselectAll: () -> Unit,
     onNavigateToBrowse: () -> Unit,
 ) {
     val payload = state.payload
-    LazyColumn(contentPadding = contentPadding, modifier = Modifier.fillMaxSize()) {
+    val isMultiManga = payload.manga.size > 1
+
+    LazyColumn(
+        contentPadding = contentPadding,
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        // Header: count
         item {
             Text(
                 text = stringResource(MR.strings.qr_import_count, payload.manga.size),
@@ -142,9 +161,15 @@ private fun QrImportContent(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             )
         }
+
+        // Missing sources warning card
         if (missingSources.isNotEmpty()) {
             item {
-                ElevatedCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -167,12 +192,16 @@ private fun QrImportContent(
                         Spacer(Modifier.height(8.dp))
                         missingSources.forEach { source ->
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    text = source.name.ifBlank { stringResource(MR.strings.qr_source_unavailable) },
+                                    text = source.name.ifBlank {
+                                        stringResource(MR.strings.qr_source_unavailable)
+                                    },
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
@@ -185,48 +214,18 @@ private fun QrImportContent(
                 }
             }
         }
+
+        // Category preference chips
         item {
-            ElevatedCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                payload.manga.forEach { qrManga ->
-                    val isMissingSource = qrManga.source !in state.installedSourceIds
-                    val sourceName = payload.sources.find { it.sourceId == qrManga.source }
-                        ?.name?.ifBlank { null }
-                        ?: stringResource(MR.strings.qr_source_unavailable)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        AsyncImage(
-                            model = qrManga.thumbnailUrl,
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp),
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(qrManga.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                            Text(
-                                text = sourceName,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                            )
-                        }
-                        if (isMissingSource) {
-                            Icon(
-                                imageVector = Icons.Outlined.Warning,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        item {
-            ElevatedCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     FilterChip(
@@ -242,34 +241,114 @@ private fun QrImportContent(
                 }
             }
         }
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(
-                    onClick = onImportAll,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.isImporting,
+
+        // Select all / deselect all row for multi-manga
+        if (isMultiManga) {
+            item {
+                val allSelected = state.selectedMangaIndices.size == payload.manga.size
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(MR.strings.qr_add_to_library))
-                }
-                if (missingSources.isNotEmpty()) {
-                    OutlinedButton(
-                        onClick = onImportAvailableOnly,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.isImporting,
-                    ) {
-                        Text(stringResource(MR.strings.qr_add_available_only))
+                    TextButton(onClick = if (allSelected) onDeselectAll else onSelectAll) {
+                        Text(
+                            text = if (allSelected) {
+                                stringResource(MR.strings.action_deselect_all)
+                            } else {
+                                stringResource(MR.strings.action_select_all)
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                        )
                     }
                 }
-                TextButton(
-                    onClick = onCancel,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(MR.strings.action_cancel))
-                }
             }
+        }
+
+        // Manga list with dividers
+        item {
+            HorizontalDivider()
+        }
+
+        payload.manga.forEachIndexed { index, qrManga ->
+            item(key = index) {
+                val isMissingSource = qrManga.source !in state.installedSourceIds
+                val sourceName = payload.sources
+                    .find { it.sourceId == qrManga.source }
+                    ?.name
+                    ?.ifBlank { null }
+                    ?: stringResource(MR.strings.qr_source_unavailable)
+
+                val categoryNames = qrManga.categories
+                    .mapNotNull { catId -> payload.categories.find { it.id == catId }?.name }
+                    .joinToString(", ")
+
+                val isSelected = index in state.selectedMangaIndices
+
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = qrManga.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                        )
+                    },
+                    supportingContent = {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = sourceName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                                if (isMissingSource) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Outlined.Warning,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(12.dp),
+                                    )
+                                }
+                            }
+                            if (categoryNames.isNotEmpty()) {
+                                Text(
+                                    text = categoryNames,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    },
+                    leadingContent = {
+                        AsyncImage(
+                            model = qrManga.thumbnailUrl,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                        )
+                    },
+                    trailingContent = if (isMultiManga) {
+                        {
+                            Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = { onToggleMangaSelection(index) },
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                )
+                HorizontalDivider()
+            }
+        }
+
+        // Bottom padding so FAB doesn't cover last item
+        item {
+            Spacer(Modifier.height(80.dp))
         }
     }
 }
@@ -291,6 +370,7 @@ class QrImportPreviewScreenModel(
         val importedCount: Int = 0,
         val isDone: Boolean = false,
         val error: String? = null,
+        val selectedMangaIndices: Set<Int> = emptySet(),
     )
 
     val missingSources: List<BackupSource>
@@ -302,7 +382,13 @@ class QrImportPreviewScreenModel(
                 .flatMap { it.sources }
                 .map { it.id }
                 .toSet()
-            mutableState.update { it.copy(payload = payload, installedSourceIds = installedIds) }
+            mutableState.update {
+                it.copy(
+                    payload = payload,
+                    installedSourceIds = installedIds,
+                    selectedMangaIndices = payload.manga.indices.toSet(),
+                )
+            }
         }
     }
 
@@ -310,7 +396,27 @@ class QrImportPreviewScreenModel(
         mutableState.update { it.copy(keepOriginalCategories = !it.keepOriginalCategories) }
     }
 
-    fun importAll(allowMissingSources: Boolean) {
+    fun toggleMangaSelection(index: Int) {
+        mutableState.update { s ->
+            val current = s.selectedMangaIndices.toMutableSet()
+            if (index in current) current.remove(index) else current.add(index)
+            s.copy(selectedMangaIndices = current)
+        }
+    }
+
+    fun selectAll() {
+        mutableState.update { s ->
+            s.copy(selectedMangaIndices = s.payload.manga.indices.toSet())
+        }
+    }
+
+    fun deselectAll() {
+        mutableState.update { s ->
+            s.copy(selectedMangaIndices = emptySet())
+        }
+    }
+
+    fun importSelected(allowMissingSources: Boolean = true) {
         screenModelScope.launchIO {
             mutableState.update { it.copy(isImporting = true) }
             try {
@@ -318,7 +424,12 @@ class QrImportPreviewScreenModel(
                 val payload = currentState.payload
                 val localCategories = getCategories.await().toMutableList()
                 var importedCount = 0
-                for (qrManga in payload.manga) {
+
+                val mangaToImport = payload.manga.filterIndexed { idx, _ ->
+                    idx in currentState.selectedMangaIndices
+                }
+
+                for (qrManga in mangaToImport) {
                     if (!allowMissingSources && qrManga.source !in currentState.installedSourceIds) continue
                     val manga = Manga.create().copy(
                         url = qrManga.url,
@@ -328,7 +439,6 @@ class QrImportPreviewScreenModel(
                         favorite = true,
                     )
                     val localManga = networkToLocalManga(manga)
-                    // Ensure the manga is favorited even if it already existed in DB as non-favorite
                     if (!localManga.favorite) {
                         updateManga.awaitUpdateFavorite(localManga.id, true)
                     }
@@ -354,7 +464,9 @@ class QrImportPreviewScreenModel(
                     }
                     importedCount++
                 }
-                mutableState.update { it.copy(isImporting = false, importedCount = importedCount, isDone = true) }
+                mutableState.update {
+                    it.copy(isImporting = false, importedCount = importedCount, isDone = true)
+                }
             } catch (e: Exception) {
                 mutableState.update { it.copy(isImporting = false, error = e.message) }
             }

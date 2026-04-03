@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
@@ -30,11 +31,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.rememberScreenModel
@@ -43,13 +49,30 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.backup.qr.QrPayloadBuilder
 import eu.kanade.tachiyomi.util.storage.cacheImageDir
 import eu.kanade.tachiyomi.util.storage.getUriCompat
-import eu.kanade.tachiyomi.util.system.QrCodeGenerator
 import eu.kanade.tachiyomi.util.system.toast
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import logcat.LogPriority
+import qrgenerator.QRCodeImage
+import qrgenerator.qrkitpainter.PatternType
+import qrgenerator.qrkitpainter.QrBallType
+import qrgenerator.qrkitpainter.QrFrameType
+import qrgenerator.qrkitpainter.QrKitBrush
+import qrgenerator.qrkitpainter.QrKitColors
+import qrgenerator.qrkitpainter.QrKitLogo
+import qrgenerator.qrkitpainter.QrKitShapes
+import qrgenerator.qrkitpainter.QrPixelType
+import qrgenerator.qrkitpainter.getSelectedFrameShape
+import qrgenerator.qrkitpainter.getSelectedPattern
+import qrgenerator.qrkitpainter.getSelectedPixel
+import qrgenerator.qrkitpainter.getSelectedQrBall
+import qrgenerator.qrkitpainter.rememberQrKitPainter
+import qrgenerator.qrkitpainter.solidBrush
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
@@ -76,6 +99,7 @@ data class QrShareScreen(
         val screenModel = rememberScreenModel { QrShareScreenModel() }
         val state by screenModel.state.collectAsState()
         val snackbarHostState = remember { SnackbarHostState() }
+        val scope = rememberCoroutineScope()
 
         LaunchedEffect(Unit) {
             screenModel.loadQrCodes(mangaIds, categoryId)
@@ -97,11 +121,11 @@ data class QrShareScreen(
                     Modifier.fillMaxSize().padding(contentPadding),
                     contentAlignment = Alignment.Center,
                 ) { Text(state.error!!) }
-                state.qrBitmaps.isNotEmpty() -> QrShareContent(
+                state.qrData.isNotEmpty() -> QrShareContent(
                     state = state,
                     modifier = Modifier.padding(contentPadding),
-                    onSave = { idx -> screenModel.saveToGallery(context, idx) },
-                    onShare = { idx -> screenModel.shareBitmap(context, idx) },
+                    context = context,
+                    scope = scope,
                 )
             }
         }
@@ -112,41 +136,137 @@ data class QrShareScreen(
 private fun QrShareContent(
     state: QrShareScreenModel.State,
     modifier: Modifier,
-    onSave: (Int) -> Unit,
-    onShare: (Int) -> Unit,
+    context: Context,
+    scope: CoroutineScope,
 ) {
-    val bitmaps = state.qrBitmaps
-    if (bitmaps.isEmpty()) return
+    val items = state.qrData
+    if (items.isEmpty()) return
+
+    // Captured bitmaps indexed by page for save/share
+    val capturedBitmaps = remember(items.size) {
+        mutableStateListOf<ImageBitmap?>().also { list ->
+            repeat(items.size) { list.add(null) }
+        }
+    }
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val logoPainter = painterResource(R.drawable.ic_mihon)
+
     Column(
-        modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        if (bitmaps.size == 1) {
-            Spacer(Modifier.weight(1f))
-            Image(
-                bitmap = bitmaps[0].asImageBitmap(),
+        if (items.size == 1) {
+            val (uri, label) = items[0]
+
+            // Invisible QRCodeImage to capture bitmap for save/share
+            QRCodeImage(
+                modifier = Modifier
+                    .size(1.dp)
+                    .alpha(0f),
+                url = uri,
                 contentDescription = null,
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                onSuccess = { bmp -> capturedBitmaps[0] = bmp },
             )
+
             Spacer(Modifier.weight(1f))
-            QrShareButtons(onSave = { onSave(0) }, onShare = { onShare(0) })
-            Spacer(Modifier.height(16.dp))
-        } else {
-            val pagerState = rememberPagerState { bitmaps.size }
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-            ) { page ->
-                Image(
-                    bitmap = bitmaps[page].asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(8.dp),
+
+            val painter = rememberQrKitPainter(data = uri) {
+                colors = QrKitColors(
+                    darkBrush = QrKitBrush.solidBrush(primaryColor),
+                )
+                logo = QrKitLogo(logoPainter)
+                shapes = QrKitShapes(
+                    ballShape = getSelectedQrBall(QrBallType.CircleQrBall()),       // inner corner dots
+                    darkPixelShape = getSelectedPixel(QrPixelType.CirclePixel()),   // the data modules
+                    frameShape = getSelectedFrameShape(QrFrameType.RoundCornersFrame(
+                        corner = 16.0F,
+                    )),
+                    codeShape = getSelectedPattern(PatternType.SquarePattern),      // overall module pattern
                 )
             }
+            Image(
+                painter = painter,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .padding(8.dp),
+            )
             Text(
-                text = stringResource(MR.strings.qr_sequence_progress, pagerState.currentPage + 1, bitmaps.size),
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+
+            Spacer(Modifier.weight(1f))
+            QrShareButtons(
+                onSave = {
+                    scope.launch {
+                        saveToGallery(context, capturedBitmaps[0]?.asAndroidBitmap())
+                    }
+                },
+                onShare = {
+                    scope.launch {
+                        shareBitmap(context, capturedBitmaps[0]?.asAndroidBitmap())
+                    }
+                },
+            )
+            Spacer(Modifier.height(24.dp))
+        } else {
+            val pagerState = rememberPagerState { items.size }
+
+            // Invisible QRCodeImages to pre-capture all bitmaps
+            items.forEachIndexed { idx, (uri, _) ->
+                QRCodeImage(
+                    modifier = Modifier
+                        .size(1.dp)
+                        .alpha(0f),
+                    url = uri,
+                    contentDescription = null,
+                    onSuccess = { bmp -> capturedBitmaps[idx] = bmp },
+                )
+            }
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) { page ->
+                val (uri, label) = items[page]
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val painter = rememberQrKitPainter(data = uri) {
+                        colors = QrKitColors(
+                            darkBrush = QrKitBrush.solidBrush(primaryColor),
+                        )
+                        logo = QrKitLogo(logoPainter)
+                    }
+                    Image(
+                        painter = painter,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
+                    )
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+            }
+
+            Text(
+                text = stringResource(
+                    MR.strings.qr_sequence_progress,
+                    pagerState.currentPage + 1,
+                    items.size,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
@@ -155,10 +275,24 @@ private fun QrShareContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             QrShareButtons(
-                onSave = { onSave(pagerState.currentPage) },
-                onShare = { onShare(pagerState.currentPage) },
+                onSave = {
+                    scope.launch {
+                        saveToGallery(
+                            context,
+                            capturedBitmaps.getOrNull(pagerState.currentPage)?.asAndroidBitmap(),
+                        )
+                    }
+                },
+                onShare = {
+                    scope.launch {
+                        shareBitmap(
+                            context,
+                            capturedBitmaps.getOrNull(pagerState.currentPage)?.asAndroidBitmap(),
+                        )
+                    }
+                },
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -171,6 +305,63 @@ private fun QrShareButtons(onSave: () -> Unit, onShare: () -> Unit) {
     }
 }
 
+private suspend fun saveToGallery(context: Context, bitmap: Bitmap?) {
+    if (bitmap == null) return
+    try {
+        val filename = "mihon_qr_${System.currentTimeMillis()}.png"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+            val resolver = context.contentResolver
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: return
+            resolver.openOutputStream(uri)?.use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+            values.clear()
+            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+        } else {
+            @Suppress("DEPRECATION")
+            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+            dir.mkdirs()
+            File(dir, filename).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        withUIContext { context.toast(MR.strings.qr_saved_to_gallery) }
+    } catch (e: Exception) {
+//        logcat(LogPriority.ERROR, e)
+    }
+}
+
+private suspend fun shareBitmap(context: Context, bitmap: Bitmap?) {
+    if (bitmap == null) return
+    try {
+        val cacheDir = context.cacheImageDir
+        cacheDir.mkdirs()
+        val file = File(cacheDir, "qr_share.png")
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val uri = file.getUriCompat(context)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        withUIContext {
+            context.startActivity(
+                Intent.createChooser(intent, null).also {
+                    it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+            )
+        }
+    } catch (e: Exception) {
+//        logcat(LogPriority.ERROR, e)
+    }
+}
+
 class QrShareScreenModel(
     private val payloadBuilder: QrPayloadBuilder = QrPayloadBuilder(),
     private val getManga: GetManga = Injekt.get(),
@@ -180,7 +371,7 @@ class QrShareScreenModel(
 
     data class State(
         val isLoading: Boolean = true,
-        val qrBitmaps: List<Bitmap> = emptyList(),
+        val qrData: List<Pair<String, String>> = emptyList(), // uri to label
         val error: String? = null,
     )
 
@@ -214,75 +405,18 @@ class QrShareScreenModel(
                 }
 
                 val uris = payloadBuilder.build(selectedManga, mangaCategoryIds, categories)
-                val bitmaps = uris.mapIndexed { index, uri ->
+                val pairs = uris.mapIndexed { index, uri ->
                     val label = when {
                         selectedManga.size == 1 -> selectedManga.first().title
                         uris.size > 1 -> "${index + 1}/${uris.size} · ${selectedManga.size} manga"
                         else -> "${selectedManga.size} manga"
                     }
-                    QrCodeGenerator.generateWithLabel(uri, label)
+                    uri to label
                 }
-                mutableState.update { it.copy(isLoading = false, qrBitmaps = bitmaps) }
+                mutableState.update { it.copy(isLoading = false, qrData = pairs) }
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e)
                 mutableState.update { it.copy(isLoading = false, error = e.message ?: "Error") }
-            }
-        }
-    }
-
-    fun saveToGallery(context: Context, bitmapIndex: Int) {
-        val bitmap = state.value.qrBitmaps.getOrNull(bitmapIndex) ?: return
-        screenModelScope.launchIO {
-            try {
-                val filename = "mihon_qr_${System.currentTimeMillis()}.png"
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Images.Media.DISPLAY_NAME, filename)
-                        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-                        put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
-                        put(MediaStore.Images.Media.IS_PENDING, 1)
-                    }
-                    val resolver = context.contentResolver
-                    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                        ?: return@launchIO
-                    resolver.openOutputStream(uri)?.use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-                    values.clear()
-                    values.put(MediaStore.Images.Media.IS_PENDING, 0)
-                    resolver.update(uri, values, null, null)
-                } else {
-                    @Suppress("DEPRECATION")
-                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                    dir.mkdirs()
-                    File(dir, filename).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                }
-                withUIContext { context.toast(MR.strings.qr_saved_to_gallery) }
-            } catch (e: Exception) {
-                logcat(LogPriority.ERROR, e)
-            }
-        }
-    }
-
-    fun shareBitmap(context: Context, bitmapIndex: Int) {
-        val bitmap = state.value.qrBitmaps.getOrNull(bitmapIndex) ?: return
-        screenModelScope.launchIO {
-            try {
-                val cacheDir = context.cacheImageDir
-                cacheDir.mkdirs()
-                val file = File(cacheDir, "qr_share.png")
-                file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                val uri = file.getUriCompat(context)
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "image/png"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                withUIContext {
-                    context.startActivity(
-                        Intent.createChooser(intent, null).also { it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                    )
-                }
-            } catch (e: Exception) {
-                logcat(LogPriority.ERROR, e)
             }
         }
     }

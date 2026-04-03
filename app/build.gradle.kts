@@ -268,8 +268,7 @@ dependencies {
     implementation(libs.swipe)
 
     // QR code generation and scanning
-    implementation(libs.zxing.android.embedded)
-    implementation(libs.zxing.core)
+    implementation(libs.qrkit)
     implementation(libs.composeWebview)
     implementation(libs.composeGrid)
     implementation(libs.reorderable)
