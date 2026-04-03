@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
@@ -31,14 +30,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -58,7 +57,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import logcat.LogPriority
-import qrgenerator.QRCodeImage
 import qrgenerator.qrkitpainter.PatternType
 import qrgenerator.qrkitpainter.QrBallType
 import qrgenerator.qrkitpainter.QrFrameType
@@ -142,12 +140,6 @@ private fun QrShareContent(
     val items = state.qrData
     if (items.isEmpty()) return
 
-    // Captured bitmaps indexed by page for save/share
-    val capturedBitmaps = remember(items.size) {
-        mutableStateListOf<ImageBitmap?>().also { list ->
-            repeat(items.size) { list.add(null) }
-        }
-    }
     val primaryColor = MaterialTheme.colorScheme.primary
     val logoPainter = painterResource(R.drawable.ic_mihon)
 
@@ -160,16 +152,7 @@ private fun QrShareContent(
     ) {
         if (items.size == 1) {
             val (uri, label) = items[0]
-
-            // Invisible QRCodeImage to capture bitmap for save/share
-            QRCodeImage(
-                modifier = Modifier
-                    .size(1.dp)
-                    .alpha(0f),
-                url = uri,
-                contentDescription = null,
-                onSuccess = { bmp -> capturedBitmaps[0] = bmp },
-            )
+            val graphicsLayer = rememberGraphicsLayer()
 
             Spacer(Modifier.weight(1f))
 
@@ -179,12 +162,10 @@ private fun QrShareContent(
                 )
                 logo = QrKitLogo(logoPainter)
                 shapes = QrKitShapes(
-                    ballShape = getSelectedQrBall(QrBallType.CircleQrBall()),       // inner corner dots
-                    darkPixelShape = getSelectedPixel(QrPixelType.CirclePixel()),   // the data modules
-                    frameShape = getSelectedFrameShape(QrFrameType.RoundCornersFrame(
-                        corner = 16.0F,
-                    )),
-                    codeShape = getSelectedPattern(PatternType.SquarePattern),      // overall module pattern
+                    ballShape = getSelectedQrBall(QrBallType.CircleQrBall()),
+                    darkPixelShape = getSelectedPixel(QrPixelType.CirclePixel()),
+                    frameShape = getSelectedFrameShape(QrFrameType.RoundCornersFrame(corner = 16.0F)),
+                    codeShape = getSelectedPattern(PatternType.SquarePattern),
                 )
             }
             Image(
@@ -193,7 +174,11 @@ private fun QrShareContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .padding(8.dp),
+                    .padding(8.dp)
+                    .drawWithContent {
+                        graphicsLayer.record { this@drawWithContent.drawContent() }
+                        drawLayer(graphicsLayer)
+                    },
             )
             Text(
                 text = label,
@@ -205,30 +190,20 @@ private fun QrShareContent(
             QrShareButtons(
                 onSave = {
                     scope.launch {
-                        saveToGallery(context, capturedBitmaps[0]?.asAndroidBitmap())
+                        saveToGallery(context, graphicsLayer.toImageBitmap().asAndroidBitmap())
                     }
                 },
                 onShare = {
                     scope.launch {
-                        shareBitmap(context, capturedBitmaps[0]?.asAndroidBitmap())
+                        shareBitmap(context, graphicsLayer.toImageBitmap().asAndroidBitmap())
                     }
                 },
             )
             Spacer(Modifier.height(24.dp))
         } else {
             val pagerState = rememberPagerState { items.size }
-
-            // Invisible QRCodeImages to pre-capture all bitmaps
-            items.forEachIndexed { idx, (uri, _) ->
-                QRCodeImage(
-                    modifier = Modifier
-                        .size(1.dp)
-                        .alpha(0f),
-                    url = uri,
-                    contentDescription = null,
-                    onSuccess = { bmp -> capturedBitmaps[idx] = bmp },
-                )
-            }
+            // One graphics layer per page, keyed by page count
+            val pageGraphicsLayers = remember(items.size) { arrayOfNulls<androidx.compose.ui.graphics.layer.GraphicsLayer>(items.size) }
 
             HorizontalPager(
                 state = pagerState,
@@ -238,12 +213,21 @@ private fun QrShareContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) { page ->
                 val (uri, label) = items[page]
+                val graphicsLayer = rememberGraphicsLayer()
+                pageGraphicsLayers[page] = graphicsLayer
+
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     val painter = rememberQrKitPainter(data = uri) {
                         colors = QrKitColors(
                             darkBrush = QrKitBrush.solidBrush(primaryColor),
                         )
                         logo = QrKitLogo(logoPainter)
+                        shapes = QrKitShapes(
+                            ballShape = getSelectedQrBall(QrBallType.CircleQrBall()),
+                            darkPixelShape = getSelectedPixel(QrPixelType.CirclePixel()),
+                            frameShape = getSelectedFrameShape(QrFrameType.RoundCornersFrame(corner = 16.0F)),
+                            codeShape = getSelectedPattern(PatternType.SquarePattern),
+                        )
                     }
                     Image(
                         painter = painter,
@@ -251,7 +235,11 @@ private fun QrShareContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
-                            .padding(horizontal = 8.dp, vertical = 12.dp),
+                            .padding(horizontal = 8.dp, vertical = 12.dp)
+                            .drawWithContent {
+                                graphicsLayer.record { this@drawWithContent.drawContent() }
+                                drawLayer(graphicsLayer)
+                            },
                     )
                     Text(
                         text = label,
@@ -277,18 +265,16 @@ private fun QrShareContent(
             QrShareButtons(
                 onSave = {
                     scope.launch {
-                        saveToGallery(
-                            context,
-                            capturedBitmaps.getOrNull(pagerState.currentPage)?.asAndroidBitmap(),
-                        )
+                        pageGraphicsLayers[pagerState.currentPage]?.let {
+                            saveToGallery(context, it.toImageBitmap().asAndroidBitmap())
+                        }
                     }
                 },
                 onShare = {
                     scope.launch {
-                        shareBitmap(
-                            context,
-                            capturedBitmaps.getOrNull(pagerState.currentPage)?.asAndroidBitmap(),
-                        )
+                        pageGraphicsLayers[pagerState.currentPage]?.let {
+                            shareBitmap(context, it.toImageBitmap().asAndroidBitmap())
+                        }
                     }
                 },
             )
