@@ -198,7 +198,14 @@ class QrShareScreenModel(
                 val mangaCategoryIds = selectedLibraryManga.associate { it.manga.id to it.categories }
                 val categories = getCategories.await()
                 val uris = payloadBuilder.build(selectedManga, mangaCategoryIds, categories)
-                val bitmaps = uris.map { QrCodeGenerator.generate(it) }
+                val bitmaps = uris.mapIndexed { index, uri ->
+                    val label = when {
+                        selectedManga.size == 1 -> selectedManga.first().title
+                        uris.size > 1 -> "${index + 1}/${uris.size} · ${selectedManga.size} manga"
+                        else -> "${selectedManga.size} manga"
+                    }
+                    QrCodeGenerator.generateWithLabel(uri, label)
+                }
                 mutableState.update { it.copy(isLoading = false, qrBitmaps = bitmaps) }
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e)

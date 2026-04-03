@@ -8,14 +8,19 @@ import eu.kanade.tachiyomi.data.backup.models.backupCategoryMapper
 import kotlinx.serialization.protobuf.ProtoBuf
 import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.manga.model.Manga
+import tachiyomi.domain.source.service.SourceManager
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 private const val MAX_QR_PAYLOAD_BYTES = 2700
 const val QR_URI_SCHEME = "mihon://qr/"
 
-class QrPayloadBuilder {
+class QrPayloadBuilder(
+    private val sourceManager: SourceManager = Injekt.get(),
+) {
     fun build(
         manga: List<Manga>,
         mangaCategoryIds: Map<Long, List<Long>>,
@@ -26,7 +31,10 @@ class QrPayloadBuilder {
             .filter { it.id in referencedCategoryIds }
             .map(backupCategoryMapper)
         val sources = manga
-            .map { BackupSource(sourceId = it.source, name = "") }
+            .map { m ->
+                val sourceName = sourceManager.get(m.source)?.name ?: ""
+                BackupSource(sourceId = m.source, name = sourceName)
+            }
             .distinctBy { it.sourceId }
         val qrManga = manga.map { m ->
             QrShareManga(

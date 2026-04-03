@@ -1,10 +1,17 @@
 package eu.kanade.tachiyomi.ui.qrshare
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -19,9 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -48,9 +57,25 @@ data object QrScanScreen : Screen() {
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
+        val context = LocalContext.current
         val screenModel = rememberScreenModel { QrScanScreenModel() }
         val state by screenModel.state.collectAsState()
         val snackbarHostState = remember { SnackbarHostState() }
+
+        var hasCameraPermission by remember {
+            mutableStateOf(
+                ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED,
+            )
+        }
+        val permissionLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted -> hasCameraPermission = granted }
+
+        LaunchedEffect(Unit) {
+            if (!hasCameraPermission) {
+                permissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
 
         LaunchedEffect(state.completedPayload) {
             if (state.completedPayload != null) {
@@ -77,15 +102,38 @@ data object QrScanScreen : Screen() {
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         ) { contentPadding ->
             Box(Modifier.fillMaxSize().padding(contentPadding)) {
-                QrScannerView(
-                    modifier = Modifier.fillMaxSize(),
-                    onScan = { raw -> screenModel.onScan(raw, errorMessage) },
-                )
-                ScanOverlayText(
-                    state = state,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
-                )
+                if (hasCameraPermission) {
+                    QrScannerView(
+                        modifier = Modifier.fillMaxSize(),
+                        onScan = { raw -> screenModel.onScan(raw, errorMessage) },
+                    )
+                    ScanOverlayText(
+                        state = state,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
+                    )
+                } else {
+                    CameraPermissionDeniedContent(
+                        modifier = Modifier.align(Alignment.Center),
+                        onRequestPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun CameraPermissionDeniedContent(modifier: Modifier, onRequestPermission: () -> Unit) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = stringResource(MR.strings.qr_camera_permission_required),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRequestPermission) {
+            Text(stringResource(MR.strings.qr_grant_camera_permission))
         }
     }
 }

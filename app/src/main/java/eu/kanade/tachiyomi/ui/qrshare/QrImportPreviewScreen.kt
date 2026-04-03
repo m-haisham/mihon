@@ -42,13 +42,13 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
+import eu.kanade.domain.manga.interactor.UpdateManga
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.data.backup.models.BackupSource
 import eu.kanade.tachiyomi.data.backup.models.QrSharePayload
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.ui.home.HomeScreen
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tachiyomi.core.common.i18n.stringResource
@@ -278,6 +278,7 @@ class QrImportPreviewScreenModel(
     private val extensionManager: ExtensionManager = Injekt.get(),
     private val createCategoryWithName: CreateCategoryWithName = Injekt.get(),
     private val networkToLocalManga: NetworkToLocalManga = Injekt.get(),
+    private val updateManga: UpdateManga = Injekt.get(),
     private val setMangaCategories: SetMangaCategories = Injekt.get(),
     private val getCategories: GetCategories = Injekt.get(),
 ) : StateScreenModel<QrImportPreviewScreenModel.State>(State(payload = QrSharePayload())) {
@@ -297,7 +298,7 @@ class QrImportPreviewScreenModel(
 
     fun initialize(payload: QrSharePayload) {
         screenModelScope.launchIO {
-            val installedIds = extensionManager.installedExtensionsFlow.first()
+            val installedIds = extensionManager.installedExtensionsFlow.value
                 .flatMap { it.sources }
                 .map { it.id }
                 .toSet()
@@ -327,6 +328,10 @@ class QrImportPreviewScreenModel(
                         favorite = true,
                     )
                     val localManga = networkToLocalManga(manga)
+                    // Ensure the manga is favorited even if it already existed in DB as non-favorite
+                    if (!localManga.favorite) {
+                        updateManga.awaitUpdateFavorite(localManga.id, true)
+                    }
                     if (currentState.keepOriginalCategories && qrManga.categories.isNotEmpty()) {
                         val categoryIds = mutableListOf<Long>()
                         for (catId in qrManga.categories) {

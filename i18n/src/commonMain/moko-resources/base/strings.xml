@@ -1070,4 +1070,7 @@
     <string name="qr_keep_original_categories">Keep original categories</string>
     <string name="qr_no_categories">No category</string>
     <string name="qr_source_unavailable">Source unavailable</string>
+    <string name="qr_camera_permission_required">Camera permission is required to scan QR codes</string>
+    <string name="qr_grant_camera_permission">Grant permission</string>
+    <string name="qr_share_label">Mihon QR Share</string>
 </resources>
