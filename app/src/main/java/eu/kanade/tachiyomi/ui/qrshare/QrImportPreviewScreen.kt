@@ -84,10 +84,14 @@ data class QrImportPreviewScreen(
 
         LaunchedEffect(state.isDone) {
             if (state.isDone) {
+                navigator.popUntil { it !is QrImportPreviewScreen && it !is QrScanScreen }
+                if (navigator.isEmpty) {
+                    navigator.replace(HomeScreen)
+                }
+
                 snackbarHostState.showSnackbar(
                     context.stringResource(MR.strings.qr_import_success, state.importedCount),
                 )
-                navigator.pop()
             }
         }
 
@@ -217,28 +221,22 @@ private fun QrImportContent(
 
         // Category preference chips
         item {
-            ElevatedCard(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    FilterChip(
-                        selected = state.keepOriginalCategories,
-                        onClick = onToggleKeepCategories,
-                        label = { Text(stringResource(MR.strings.qr_keep_original_categories)) },
-                    )
-                    FilterChip(
-                        selected = !state.keepOriginalCategories,
-                        onClick = onToggleKeepCategories,
-                        label = { Text(stringResource(MR.strings.qr_no_categories)) },
-                    )
-                }
+                FilterChip(
+                    selected = state.keepOriginalCategories,
+                    onClick = onToggleKeepCategories,
+                    label = { Text(stringResource(MR.strings.qr_keep_original_categories)) },
+                )
+                FilterChip(
+                    selected = !state.keepOriginalCategories,
+                    onClick = onToggleKeepCategories,
+                    label = { Text(stringResource(MR.strings.qr_no_categories)) },
+                )
             }
         }
 
