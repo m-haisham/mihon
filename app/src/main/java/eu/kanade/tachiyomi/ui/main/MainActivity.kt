@@ -78,6 +78,7 @@ import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.more.NewUpdateScreen
 import eu.kanade.tachiyomi.ui.more.OnboardingScreen
+import eu.kanade.tachiyomi.ui.qrshare.QrImportDeepLinkScreen
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.isNavigationBarNeedsScrim
 import eu.kanade.tachiyomi.util.system.openInBrowser
@@ -445,6 +446,12 @@ class MainActivity : BaseActivity() {
                         navigator.popUntilRoot()
                         navigator.push(ExtensionReposScreen(repoUrl))
                     }
+                }
+                // Deep link to import QR share
+                else if (intent.scheme == "mihon" && intent.data?.host == "qr") {
+                    val rawUri = intent.data.toString()
+                    navigator.popUntilRoot()
+                    navigator.push(QrImportDeepLinkScreen(rawUri))
                 }
                 null
             }

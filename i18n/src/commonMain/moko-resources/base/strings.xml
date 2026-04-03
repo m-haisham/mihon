@@ -1047,4 +1047,27 @@
     <string name="migrationListScreen.migrateDialog.cancelLabel">Cancel</string>
     <string name="migrationListScreen.progressDialog.cancelLabel">Cancel</string>
     <string name="migrationListScreen.matchWithoutChapterToast">No chapters found, this entry cannot be used for migration</string>
+
+    <!-- QR Code sharing -->
+    <string name="action_share_via_qr">Share via QR Code</string>
+    <string name="qr_share_title">Share via QR</string>
+    <string name="qr_scan_title">Scan QR Code</string>
+    <string name="qr_import_title">Import from QR</string>
+    <string name="qr_missing_sources">Missing sources</string>
+    <string name="qr_missing_sources_message">Some manga require extensions that are not installed.</string>
+    <string name="qr_sequence_progress">Code %1$d of %2$d</string>
+    <string name="qr_sequence_instruction">Ask your friend to scan each code in order</string>
+    <string name="qr_add_to_library">Add to Library</string>
+    <string name="qr_add_available_only">Add Available Only</string>
+    <string name="qr_save_to_gallery">Save to Gallery</string>
+    <string name="qr_saved_to_gallery">Saved to gallery</string>
+    <string name="qr_import_count">%1$d manga shared</string>
+    <string name="qr_scan_instruction">Point your camera at a Mihon QR code</string>
+    <string name="qr_scan_multi_progress">Scanned %1$d of %2$d — keep going!</string>
+    <string name="qr_scan_error">Could not read QR code</string>
+    <string name="qr_import_success">%1$d manga added to library</string>
+    <string name="qr_install_extension">Install "%1$s" extension</string>
+    <string name="qr_keep_original_categories">Keep original categories</string>
+    <string name="qr_no_categories">No category</string>
+    <string name="qr_source_unavailable">Source unavailable</string>
 </resources>

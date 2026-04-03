@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DragHandle
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.QrCode
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,6 +28,7 @@ fun ReorderableCollectionItemScope.CategoryListItem(
     category: Category,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onShareViaQr: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ElevatedCard(modifier = modifier) {
@@ -56,6 +58,12 @@ fun ReorderableCollectionItemScope.CategoryListItem(
                 Icon(
                     imageVector = Icons.Outlined.Edit,
                     contentDescription = stringResource(MR.strings.action_rename_category),
+                )
+            }
+            IconButton(onClick = onShareViaQr) {
+                Icon(
+                    imageVector = Icons.Outlined.QrCode,
+                    contentDescription = stringResource(MR.strings.action_share_via_qr),
                 )
             }
             IconButton(onClick = onDelete) {

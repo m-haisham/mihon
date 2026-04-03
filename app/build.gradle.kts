@@ -266,6 +266,10 @@ dependencies {
     implementation(libs.bundles.voyager)
     implementation(libs.composeMaterialMotion)
     implementation(libs.swipe)
+
+    // QR code generation and scanning
+    implementation(libs.zxing.android.embedded)
+    implementation(libs.zxing.core)
     implementation(libs.composeWebview)
     implementation(libs.composeGrid)
     implementation(libs.reorderable)
