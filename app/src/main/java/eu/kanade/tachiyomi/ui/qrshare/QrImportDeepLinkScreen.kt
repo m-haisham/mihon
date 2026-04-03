@@ -25,12 +25,8 @@ data class QrImportDeepLinkScreen(private val rawUri: String) : Screen() {
                     navigator.replace(QrImportPreviewScreen(payload = result.payload))
                 }
                 is QrPayloadParser.ScanResult.Chunk -> {
-                    val payload = parser.assembleAndDecode(listOf(result.encoded))
-                    if (payload != null) {
-                        navigator.replace(QrImportPreviewScreen(payload = payload))
-                    } else {
-                        navigator.replace(QrScanScreen)
-                    }
+                    // A deep link only provides one chunk; redirect to scanner to collect the rest
+                    navigator.replace(QrScanScreen)
                 }
                 is QrPayloadParser.ScanResult.Unknown -> navigator.pop()
             }

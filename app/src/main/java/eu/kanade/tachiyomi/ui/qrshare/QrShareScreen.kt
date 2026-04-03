@@ -220,7 +220,8 @@ class QrShareScreenModel(
                         put(MediaStore.Images.Media.IS_PENDING, 1)
                     }
                     val resolver = context.contentResolver
-                    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
+                    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                        ?: return@launchIO
                     resolver.openOutputStream(uri)?.use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
                     values.clear()
                     values.put(MediaStore.Images.Media.IS_PENDING, 0)
