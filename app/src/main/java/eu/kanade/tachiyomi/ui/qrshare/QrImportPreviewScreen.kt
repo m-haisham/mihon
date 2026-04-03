@@ -102,6 +102,7 @@ data class QrImportPreviewScreen(
                 QrImportContent(
                     state = state,
                     contentPadding = contentPadding,
+                    missingSources = screenModel.missingSources,
                     onToggleKeepCategories = screenModel::toggleKeepOriginalCategories,
                     onImportAll = { screenModel.importAll(allowMissingSources = true) },
                     onImportAvailableOnly = { screenModel.importAll(allowMissingSources = false) },
@@ -125,6 +126,7 @@ data class QrImportPreviewScreen(
 private fun QrImportContent(
     state: QrImportPreviewScreenModel.State,
     contentPadding: PaddingValues,
+    missingSources: List<BackupSource>,
     onToggleKeepCategories: () -> Unit,
     onImportAll: () -> Unit,
     onImportAvailableOnly: () -> Unit,
@@ -132,7 +134,6 @@ private fun QrImportContent(
     onNavigateToBrowse: () -> Unit,
 ) {
     val payload = state.payload
-    val missingSources = state.missingSources
     LazyColumn(contentPadding = contentPadding, modifier = Modifier.fillMaxSize()) {
         item {
             Text(

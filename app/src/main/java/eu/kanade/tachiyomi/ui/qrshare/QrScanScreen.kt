@@ -39,7 +39,6 @@ import eu.kanade.tachiyomi.data.backup.models.QrSharePayload
 import eu.kanade.tachiyomi.data.backup.qr.QrPayloadParser
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
@@ -66,6 +65,7 @@ data object QrScanScreen : Screen() {
             }
         }
 
+        val errorMessage = stringResource(MR.strings.qr_scan_error)
         Scaffold(
             topBar = { scrollBehavior ->
                 AppBar(
@@ -79,7 +79,7 @@ data object QrScanScreen : Screen() {
             Box(Modifier.fillMaxSize().padding(contentPadding)) {
                 QrScannerView(
                     modifier = Modifier.fillMaxSize(),
-                    onScan = { raw -> screenModel.onScan(raw, stringResource(MR.strings.qr_scan_error)) },
+                    onScan = { raw -> screenModel.onScan(raw, errorMessage) },
                 )
                 ScanOverlayText(
                     state = state,
