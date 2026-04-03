@@ -55,6 +55,7 @@ import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.category.interactor.GetCategories
 import tachiyomi.domain.manga.interactor.GetLibraryManga
+import tachiyomi.domain.manga.interactor.GetManga
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
@@ -172,6 +173,7 @@ private fun QrShareButtons(onSave: () -> Unit, onShare: () -> Unit) {
 
 class QrShareScreenModel(
     private val payloadBuilder: QrPayloadBuilder = QrPayloadBuilder(),
+    private val getManga: GetManga = Injekt.get(),
     private val getLibraryManga: GetLibraryManga = Injekt.get(),
     private val getCategories: GetCategories = Injekt.get(),
 ) : StateScreenModel<QrShareScreenModel.State>(State()) {
@@ -185,18 +187,32 @@ class QrShareScreenModel(
     fun loadQrCodes(mangaIds: List<Long>, categoryId: Long? = null) {
         screenModelScope.launchIO {
             try {
-                val libraryManga = getLibraryManga.await()
-                val selectedLibraryManga = when {
-                    categoryId != null -> libraryManga.filter { it.categories.contains(categoryId) }
-                    mangaIds.isNotEmpty() -> {
-                        val byId = libraryManga.associateBy { it.manga.id }
-                        mangaIds.mapNotNull { byId[it] }
-                    }
-                    else -> libraryManga
-                }
-                val selectedManga = selectedLibraryManga.map { it.manga }
-                val mangaCategoryIds = selectedLibraryManga.associate { it.manga.id to it.categories }
                 val categories = getCategories.await()
+
+                // When sharing specific manga by ID (e.g. from MangaScreen), fetch them
+                // directly so non-library manga are also supported.
+                val selectedManga: List<tachiyomi.domain.manga.model.Manga>
+                val mangaCategoryIds: Map<Long, List<Long>>
+
+                if (categoryId != null || mangaIds.isEmpty()) {
+                    // Category share or full-library share — use library data for category info
+                    val libraryManga = getLibraryManga.await()
+                    val filtered = when {
+                        categoryId != null -> libraryManga.filter { it.categories.contains(categoryId) }
+                        else -> libraryManga
+                    }
+                    selectedManga = filtered.map { it.manga }
+                    mangaCategoryIds = filtered.associate { it.manga.id to it.categories }
+                } else {
+                    // Specific IDs — fetch directly, works for both library and non-library manga
+                    selectedManga = mangaIds.mapNotNull { getManga.await(it) }
+                    // Also try to get category associations from library for any that are in library
+                    val libraryById = getLibraryManga.await().associateBy { it.manga.id }
+                    mangaCategoryIds = selectedManga.associate { m ->
+                        m.id to (libraryById[m.id]?.categories ?: emptyList())
+                    }
+                }
+
                 val uris = payloadBuilder.build(selectedManga, mangaCategoryIds, categories)
                 val bitmaps = uris.mapIndexed { index, uri ->
                     val label = when {

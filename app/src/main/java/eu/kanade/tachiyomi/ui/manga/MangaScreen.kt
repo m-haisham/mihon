@@ -154,7 +154,7 @@ class MangaScreen(
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
             onCoverClicked = screenModel::showCoverDialog,
             onShareClicked = { shareManga(context, screenModel.manga, screenModel.source) }.takeIf { isHttpSource },
-            onShareViaQrClicked = { navigator.push(QrShareScreen(mangaIds = listOf(successState.manga.id))) }.takeIf { successState.manga.favorite },
+            onShareViaQrClicked = { navigator.push(QrShareScreen(mangaIds = listOf(successState.manga.id))) }.takeIf { isHttpSource },
             onDownloadActionClicked = screenModel::runDownloadAction.takeIf { !successState.source.isLocalOrStub() },
             onEditCategoryClicked = screenModel::showChangeCategoryDialog.takeIf { successState.manga.favorite },
             onEditFetchIntervalClicked = screenModel::showSetFetchIntervalDialog.takeIf {
